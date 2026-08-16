@@ -62,17 +62,17 @@ def get_future_klines(symbol, interval, start, end):
 
 
 # for symbol in ["BTCUSDT", "ETHUSDT"]:
-for symbol in ["SKHYNIXUSDT"]:
+for symbol in ["MUUSDT","SNDKUSDT"]:
 
     df = get_future_klines(
         symbol,
-        "4h",
-        "2026-06-01 00:00:00",
+        "1d",
+        "2026-02-01 00:00:00",
         "2026-08-26 00:00:00"
     )
 
     df.to_parquet(
-        f"data/{symbol}_4h.parquet",
+        f"data/{symbol}_1d.parquet",
         index=False
     )
 

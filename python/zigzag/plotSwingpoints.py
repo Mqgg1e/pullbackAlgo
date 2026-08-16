@@ -75,11 +75,11 @@ def plotCandlesWithSwings(klines: pd.DataFrame, swings: list[SwingPoint],
 
 
 if __name__ == "__main__":
-    klines = loadKlines("data/BTCUSDT_3d.parquet")
+    klines = loadKlines("data/SNDKUSDT_4h.parquet")
     swings = detectSwingPoints(klines.reset_index(), useAtr=True, atrPeriod=14, atrMultiple=2.0)
 
     plotCandlesWithSwings(
         klines, swings,
-        title="MUUSDT 1d - swing points (ZigZag, ATR x2)",
-        savePath="output/BTCUSDT_3d_swings.png",
+        title="SNDKUSDT_4h - swing points (ZigZag, ATR x2)",
+        savePath="output/SNDKUSDT_4h_swings.png",
     )

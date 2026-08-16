@@ -89,53 +89,48 @@ def detectSwingPoints(
     candidateHighIndex = 0
     candidateLowPrice = lows[0]
     candidateLowIndex = 0
-    lastPivotIndex: Optional[int] = None  # bar index of the most recently confirmed pivot
 
     for i in range(1, barCount):
         if state in (None, SearchState.SEARCHING_HIGH):
-            if highs[i] > candidateHighPrice:
-                candidateHighPrice = highs[i]
-                candidateHighIndex = i
-
-        if state in (None, SearchState.SEARCHING_LOW):
-            if lows[i] < candidateLowPrice:
-                candidateLowPrice = lows[i]
-                candidateLowIndex = i
-
-        if state in (None, SearchState.SEARCHING_HIGH):
+            # Check reversal FIRST, using the candidate as it stood before this
+            # bar. Only if no reversal fires does this bar's own high get to
+            # extend the candidate. This ordering is what guarantees a single
+            # bar can never both set a brand-new extreme AND confirm a reversal
+            # against that same, just-set extreme in one step.
             dropFromHigh = candidateHighPrice - lows[i]
-            # A single wide-range bar can set a new high candidate and, on the
-            # very next bar, also look confirmable as the low - guard against
-            # stamping a high and a low pivot on the same bar back to back.
-            if dropFromHigh >= thresholdAt(candidateHighIndex, candidateHighPrice) \
-                    and candidateHighIndex != lastPivotIndex:
+            if dropFromHigh >= thresholdAt(candidateHighIndex, candidateHighPrice):
                 swings.append(SwingPoint(
                     barIndex=candidateHighIndex,
                     openTime=pd.Timestamp(openTimes[candidateHighIndex]),
                     price=float(candidateHighPrice),
                     isHigh=True,
                 ))
-                lastPivotIndex = candidateHighIndex
                 state = SearchState.SEARCHING_LOW
                 candidateLowPrice = lows[i]
                 candidateLowIndex = i
                 continue
 
+            if highs[i] > candidateHighPrice:
+                candidateHighPrice = highs[i]
+                candidateHighIndex = i
+
         if state in (None, SearchState.SEARCHING_LOW):
             riseFromLow = highs[i] - candidateLowPrice
-            if riseFromLow >= thresholdAt(candidateLowIndex, candidateLowPrice) \
-                    and candidateLowIndex != lastPivotIndex:
+            if riseFromLow >= thresholdAt(candidateLowIndex, candidateLowPrice):
                 swings.append(SwingPoint(
                     barIndex=candidateLowIndex,
                     openTime=pd.Timestamp(openTimes[candidateLowIndex]),
                     price=float(candidateLowPrice),
                     isHigh=False,
                 ))
-                lastPivotIndex = candidateLowIndex
                 state = SearchState.SEARCHING_HIGH
                 candidateHighPrice = highs[i]
                 candidateHighIndex = i
                 continue
+
+            if lows[i] < candidateLowPrice:
+                candidateLowPrice = lows[i]
+                candidateLowIndex = i
 
     return swings
 

@@ -115,6 +115,58 @@ def buildTrendRuns(swings: list[SwingPoint]) -> list[list[SwingPoint]]:
     return runs
 
 
+def mergeConsecutiveSameDirectionLegs(
+    legs: list[ImpulseLeg],
+    klines: pd.DataFrame,
+    atrPeriod: int = 14,
+    maxGapAtrMultiple: float = 2.0,
+) -> list[ImpulseLeg]:
+    """
+    Two confirmed legs in a row can end up pointing the same direction for
+    two very different reasons:
+      (a) a tiny in-between wiggle broke the strict HH/HL structure test,
+          and that wiggle was too small to qualify as its own leg - there's
+          no real trend change, just noise, and the two legs should be
+          stitched back into one; or
+      (b) a genuinely large move happened in the gap (e.g. a multi-month
+          complex pullback) that failed the *reversal* confirmation check,
+          not the size check - the trend never technically reversed, but
+          there's real structure there that should stay visible as its own
+          zone, not get silently swallowed.
+
+    Only case (a) should be merged. This is decided by checking the price
+    range actually covered by the gap itself: small gap -> merge; gap with
+    a real move in it -> keep the legs separate.
+    """
+    if not legs:
+        return legs
+
+    atr = computeAtr(klines, atrPeriod)
+    merged = [legs[0]]
+
+    for leg in legs[1:]:
+        previous = merged[-1]
+        sameDirection = leg.direction == previous.direction
+        gapIsSmall = False
+
+        if sameDirection and leg.startIndex > previous.endIndex:
+            gapSlice = klines.iloc[previous.endIndex: leg.startIndex + 1]
+            gapRange = gapSlice["high"].max() - gapSlice["low"].min()
+            gapAvgAtr = atr.iloc[previous.endIndex: leg.startIndex + 1].mean()
+            if pd.notna(gapAvgAtr) and gapAvgAtr > 0:
+                gapIsSmall = gapRange / gapAvgAtr < maxGapAtrMultiple
+        elif sameDirection:
+            gapIsSmall = True  # legs are already adjacent/overlapping - nothing to lose by stitching
+
+        if sameDirection and gapIsSmall:
+            combinedPoints = previous.swingPoints + leg.swingPoints
+            merged[-1] = ImpulseLeg(swingPoints=combinedPoints, direction=leg.direction)
+        else:
+            merged.append(leg)
+
+    return merged
+
+
 def detectImpulseLegs(
     swings: list[SwingPoint],
     klines: pd.DataFrame,
@@ -136,6 +188,11 @@ def detectImpulseLegs(
     Until that happens, it's left unclassified - part of an ongoing pullback
     for step 3/4 to characterize, not a confirmed new impulse leg. A run that
     *continues* the established direction doesn't need this extra check.
+
+    Consecutive confirmed legs that end up pointing the same direction (see
+    `mergeConsecutiveSameDirectionLegs`) are stitched back together before
+    returning, so the result reads as one leg per real trend, not one leg
+    per structurally-clean fragment.
     """
     atr = computeAtr(klines, atrPeriod)
     runs = buildTrendRuns(swings)
@@ -185,7 +242,7 @@ def detectImpulseLegs(
         impulseLegs.append(candidate)
         lastConfirmed = candidate
 
-    return impulseLegs
+    return mergeConsecutiveSameDirectionLegs(impulseLegs, klines, atrPeriod=atrPeriod)
 
 
 if __name__ == "__main__":

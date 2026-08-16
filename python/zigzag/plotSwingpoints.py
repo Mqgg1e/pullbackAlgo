@@ -12,7 +12,7 @@ import mplfinance as mpf
 import numpy as np
 import pandas as pd
 
-from swingPoints import SwingPoint, detectSwingPoints
+from .swingPoints import SwingPoint, detectSwingPoints
 
 
 def loadKlines(parquetPath: str) -> pd.DataFrame:
